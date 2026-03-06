@@ -28,5 +28,15 @@ public class DatabaseConfigRunner implements CommandLineRunner {
         } catch (Exception e) {
             // Column might already exist
         }
+        
+        try {
+            jdbcTemplate.execute("ALTER TABLE shared_file ADD COLUMN category VARCHAR(100) DEFAULT '默认分类' COMMENT '分类目录'");
+        } catch (Exception e) {}
+        try {
+            jdbcTemplate.execute("ALTER TABLE shared_file ADD COLUMN type VARCHAR(20) DEFAULT 'FILE' COMMENT '类型：FILE/LINK'");
+        } catch (Exception e) {}
+        try {
+            jdbcTemplate.execute("ALTER TABLE shared_file ADD COLUMN description VARCHAR(500) DEFAULT NULL COMMENT '链接描述/推荐语'");
+        } catch (Exception e) {}
     }
 }

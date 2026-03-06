@@ -88,15 +88,8 @@
             <el-card class="box-card file-card">
               <template #header>
                 <div class="card-header">
-                  <span>📁 双人资料库</span>
-                  <el-upload
-                    action="http://146.56.250.163/duo/file/upload"
-                    :show-file-list="false"
-                    :before-upload="beforeFileUpload"
-                    :http-request="customUpload"
-                  >
-                    <el-button type="success" size="small" :loading="uploadingFile">上传文件</el-button>
-                  </el-upload>
+                  <span>📁 双人资料与干货库</span>
+                  <el-button type="success" size="small" @click="showAddDialog = true">添加资源</el-button>
                 </div>
               </template>
               
@@ -109,19 +102,32 @@
               />
 
               <div class="file-list">
-                <div v-for="file in sharedFiles" :key="file.id" class="file-item">
-                  <div class="file-info">
-                    <el-icon><Document /></el-icon>
-                    <a :href="getFileFullUrl(file.fileUrl)" target="_blank" class="file-name">{{ file.fileName }}</a>
-                    <span class="file-size">{{ formatSize(file.fileSize) }}</span>
+                <div v-for="file in sharedFiles" :key="file.id" class="file-item" style="padding: 12px; margin-bottom: 8px; background: #f9fafb; border-radius: 6px; border: none; flex-direction: column; align-items: stretch;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="file-info" style="flex: 1; min-width: 0;">
+                      <el-icon v-if="file.type === 'LINK'" style="margin-top: 3px; color: #409EFF;"><Link /></el-icon>
+                      <el-icon v-else style="margin-top: 3px; color: #67c23a;"><Document /></el-icon>
+                      <div style="display: flex; flex-direction: column; overflow: hidden; margin-left: 8px; width: 100%;">
+                         <a v-if="file.type === 'LINK' || (file.fileUrl && file.fileUrl.startsWith('http'))" :href="file.fileUrl" target="_blank" class="file-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; font-weight: 500;">{{ file.fileName }}</a>
+                         <a v-else-if="isPreviewableImage(file.fileUrl)" href="javascript:void(0)" @click="previewImage(getFileFullUrl(file.fileUrl))" class="file-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px;">{{ file.fileName }}</a>
+                         <a v-else-if="isPreviewablePdf(file.fileUrl)" href="javascript:void(0)" @click="previewPdf(getFileFullUrl(file.fileUrl))" class="file-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px;">{{ file.fileName }}</a>
+                         <a v-else :href="getFileFullUrl(file.fileUrl)" target="_blank" class="file-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px;">{{ file.fileName }}</a>
+                         
+                         <span v-if="file.type === 'LINK' || (file.fileUrl && file.fileUrl.startsWith('http'))" class="file-desc" style="font-size: 12px; color: #409EFF; margin-top: 4px; display: block; overflow: hidden; text-overflow: ellipsis;">{{ file.fileUrl }}</span>
+                         <span v-if="file.description" class="file-desc" style="font-size: 13px; color: #606266; margin-top: 4px; display: block; overflow: hidden; text-overflow: ellipsis;">{{ file.description }}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div class="file-meta">
-                    <span class="file-uploader">{{ file.uploaderId === currentUser.id ? '我' : 'TA' }}上传于 {{ new Date(file.createTime).toLocaleDateString() }}</span>
-                    <el-button v-if="file.uploaderId === currentUser.id" type="danger" link size="small" @click="deleteFile(file.id)">删除</el-button>
+                  <div class="file-meta" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-left: 22px;">
+                    <div style="font-size: 12px; color: #909399;">
+                      <span v-if="file.type === 'FILE'" class="file-size" style="margin-right: 10px;">{{ formatSize(file.fileSize) }}</span>
+                      <span class="file-uploader">{{ file.uploaderId === currentUser.id ? '我' : 'TA' }}上传于 {{ new Date(file.createTime).toLocaleDateString() }}</span>
+                    </div>
+                    <el-button v-if="file.uploaderId === currentUser.id" type="danger" link size="small" @click="deleteFile(file.id)" style="margin: 0; font-size: 12px;">删除</el-button>
                   </div>
                 </div>
                 <div v-if="sharedFiles.length === 0" class="empty-files">
-                  暂无共享资料，快来上传吧！
+                  暂无共享资料或干货网址，快来添加吧！
                 </div>
               </div>
             </el-card>
@@ -129,15 +135,65 @@
         </el-row>
       </el-main>
     </el-container>
+
+    <!-- 添加资源弹窗 -->
+    <el-dialog v-model="showAddDialog" title="添加资源" width="500px">
+      <el-form label-position="top">
+        <el-form-item label="资源类型">
+          <el-radio-group v-model="addForm.type">
+            <el-radio label="FILE">📁 上传文件</el-radio>
+            <el-radio label="LINK">🔗 网址书签</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <template v-if="addForm.type === 'LINK'">
+          <el-form-item label="干货网址 (URL)">
+            <el-input v-model="addForm.fileUrl" placeholder="https://..." />
+          </el-form-item>
+          <el-form-item label="网站名称/标题">
+            <el-input v-model="addForm.fileName" placeholder="例如：考研高数必看真题解析" />
+          </el-form-item>
+          <el-form-item label="一句话推荐语 (选填)">
+            <el-input v-model="addForm.description" type="textarea" placeholder="为什么推荐它？" />
+          </el-form-item>
+        </template>
+        
+        <template v-else>
+           <el-form-item label="选择文件">
+             <el-upload
+                action="http://146.56.250.163/duo/file/upload"
+                :show-file-list="false"
+                :before-upload="beforeFileUpload"
+                :http-request="customUploadAdapter"
+              >
+                <el-button type="primary" :loading="uploadingFile">点击或拖拽上传</el-button>
+             </el-upload>
+             <div style="font-size: 12px; color: #909399; margin-top: 5px;">* 上传成功后将自动保存</div>
+           </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <div v-if="addForm.type === 'LINK'">
+          <el-button @click="showAddDialog = false">取消</el-button>
+          <el-button type="primary" :loading="savingLink" @click="saveLink">确认添加</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 图/PDF预览 -->
+    <el-image-viewer v-if="showImageViewer" :url-list="[previewImageUrl]" @close="showImageViewer = false" hide-on-click-modal />
+    <el-dialog v-model="showPdfViewer" title="文档预览" width="80%" top="5vh">
+      <iframe v-if="showPdfViewer" :src="previewPdfUrl" style="width: 100%; height: 75vh; border: none;"></iframe>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
-import { ArrowLeft, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, Document, Link } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const currentUser = ref<any>({})
@@ -149,6 +205,15 @@ const sharingNote = ref(false)
 
 const sharedFiles = ref<any[]>([])
 const uploadingFile = ref(false)
+
+const showAddDialog = ref(false)
+const addForm = ref({ type: 'FILE', category: '', fileUrl: '', fileName: '', description: '' })
+const savingLink = ref(false)
+
+const showImageViewer = ref(false)
+const previewImageUrl = ref('')
+const showPdfViewer = ref(false)
+const previewPdfUrl = ref('')
 
 const API_BASE = 'http://146.56.250.163/duo'
 const getFileFullUrl = (url: string) => {
@@ -217,10 +282,22 @@ const shareNoteAsFile = async () => {
     ElMessage.warning('笔记内容为空或未绑定搭子')
     return
   }
-  sharingNote.value = true
+  
   try {
+    const { value: fileName } = await ElMessageBox.prompt('请输入要共享的文件名(需要以.md结尾)', '共享笔记', {
+      confirmButtonText: '确定共享',
+      cancelButtonText: '取消',
+      inputValue: `笔记_${new Date().getMonth()+1}月${new Date().getDate()}日.md`,
+      inputValidator: (val) => {
+        if (!val) return '文件名不能为空'
+        if (!val.endsWith('.md')) return '文件名必须以 .md 结尾'
+        return true
+      }
+    })
+    
+    sharingNote.value = true
     const blob = new Blob([myNote.value.content], { type: 'text/markdown;charset=utf-8' })
-    const file = new File([blob], `大神的笔记_${new Date().getTime()}.md`, { type: 'text/markdown' })
+    const file = new File([blob], fileName, { type: 'text/markdown' })
     
     const formData = new FormData()
     formData.append('file', file)
@@ -236,15 +313,18 @@ const shareNoteAsFile = async () => {
         partnerId: relationInfo.value.partner.id,
         fileName: file.name,
         fileUrl: fileUrl,
-        fileSize: file.size
+        fileSize: file.size,
+        type: 'FILE'
       })
       ElMessage.success('笔记已成功共享为文件')
       loadSharedFiles()
     } else {
       ElMessage.error(uploadRes.msg || '共享失败')
     }
-  } catch (e) {
-    ElMessage.error('共享出错')
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error('共享出错')
+    }
   } finally {
     sharingNote.value = false
   }
@@ -273,7 +353,31 @@ const beforeFileUpload = (file: any) => {
   return isLt10M
 }
 
-const customUpload = async (params: any) => {
+const saveLink = async () => {
+  if(!addForm.value.fileUrl || !addForm.value.fileName) {
+    ElMessage.warning('请输入网址和名称')
+    return
+  }
+  
+  savingLink.value = true
+  try {
+    await request.post('/sharedFile/add', {
+      uploaderId: currentUser.value.id,
+      partnerId: relationInfo.value.partner.id,
+      fileName: addForm.value.fileName,
+      fileUrl: addForm.value.fileUrl,
+      fileSize: 0,
+      type: 'LINK',
+      description: addForm.value.description
+    })
+    ElMessage.success('添加成功')
+    showAddDialog.value = false
+    loadSharedFiles()
+    addForm.value = { type: 'FILE', category: '', fileUrl: '', fileName: '', description: '' }
+  } catch(e) {} finally { savingLink.value = false }
+}
+
+const customUploadAdapter = async (params: any) => {
   const file = params.file
   const formData = new FormData()
   formData.append('file', file)
@@ -290,9 +394,11 @@ const customUpload = async (params: any) => {
         partnerId: relationInfo.value.partner.id,
         fileName: file.name,
         fileUrl: fileUrl,
-        fileSize: file.size
+        fileSize: file.size,
+        type: 'FILE'
       })
       ElMessage.success('上传成功')
+      showAddDialog.value = false
       loadSharedFiles()
     } else {
       ElMessage.error(uploadRes.msg || '上传失败')
@@ -302,6 +408,27 @@ const customUpload = async (params: any) => {
   } finally {
     uploadingFile.value = false
   }
+}
+
+const isPreviewableImage = (url: string) => {
+  if(!url) return false
+  const lower = url.toLowerCase()
+  return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp')
+}
+
+const isPreviewablePdf = (url: string) => {
+  if(!url) return false
+  return url.toLowerCase().endsWith('.pdf')
+}
+
+const previewImage = (fullUrl: string) => {
+  previewImageUrl.value = fullUrl
+  showImageViewer.value = true
+}
+
+const previewPdf = (fullUrl: string) => {
+  previewPdfUrl.value = fullUrl
+  showPdfViewer.value = true
 }
 
 const deleteFile = async (id: number) => {

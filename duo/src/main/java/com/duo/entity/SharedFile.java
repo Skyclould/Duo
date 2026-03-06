@@ -16,6 +16,9 @@ public class SharedFile {
     private Long partnerId;
     private String fileName;
     private String fileUrl;
-    private Long fileSize;
+    private Long fileSize; // for links this might be 0 or null
+    private String category; // e.g. "考研资料", "复习笔记"
+    private String type; // "FILE" or "LINK"
+    private String description; // for links
     private LocalDateTime createTime;
 }
